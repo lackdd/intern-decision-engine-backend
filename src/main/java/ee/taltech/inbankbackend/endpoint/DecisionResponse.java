@@ -14,4 +14,6 @@ public class DecisionResponse {
     private Integer loanAmount;
     private Integer loanPeriod;
     private String errorMessage;
+    private boolean decision;
+    private boolean ageRestricted;
 }

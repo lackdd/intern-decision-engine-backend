@@ -47,27 +47,37 @@ public class DecisionEngineController {
         try {
             Decision decision = decisionEngine.
                     calculateApprovedLoan(request.getPersonalCode(), request.getLoanAmount(), request.getLoanPeriod());
+            boolean decisionBoolean = decisionEngine.makeDecision(request.getPersonalCode(), request.getLoanAmount(), request.getLoanPeriod());
+            boolean ageRestricted = decisionEngine.checkAge(request.getPersonalCode(), request.getLoanAmount(), request.getLoanPeriod());
             response.setLoanAmount(decision.getLoanAmount());
             response.setLoanPeriod(decision.getLoanPeriod());
             response.setErrorMessage(decision.getErrorMessage());
+            response.setDecision(decisionBoolean);
+            response.setAgeRestricted(ageRestricted);
 
             return ResponseEntity.ok(response);
         } catch (InvalidPersonalCodeException | InvalidLoanAmountException | InvalidLoanPeriodException e) {
             response.setLoanAmount(null);
             response.setLoanPeriod(null);
             response.setErrorMessage(e.getMessage());
+            response.setDecision(false);
+            response.setAgeRestricted(true);
 
             return ResponseEntity.badRequest().body(response);
         } catch (NoValidLoanException e) {
             response.setLoanAmount(null);
             response.setLoanPeriod(null);
             response.setErrorMessage(e.getMessage());
+            response.setDecision(false);
+            response.setAgeRestricted(true);
 
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         } catch (Exception e) {
             response.setLoanAmount(null);
             response.setLoanPeriod(null);
             response.setErrorMessage("An unexpected error occurred");
+            response.setDecision(false);
+            response.setAgeRestricted(true);
 
             return ResponseEntity.internalServerError().body(response);
         }

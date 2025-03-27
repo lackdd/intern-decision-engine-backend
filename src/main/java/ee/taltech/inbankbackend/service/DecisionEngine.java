@@ -8,6 +8,11 @@ import ee.taltech.inbankbackend.exceptions.InvalidPersonalCodeException;
 import ee.taltech.inbankbackend.exceptions.NoValidLoanException;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.Period;
+
 /**
  * A service class that provides a method for calculating an approved loan amount and period for a customer.
  * The loan amount is calculated based on the customer's credit modifier,
@@ -123,5 +128,87 @@ public class DecisionEngine {
             throw new InvalidLoanPeriodException("Invalid loan period!");
         }
 
+    }
+
+    public BigDecimal calculateCreditScore(String personalCode, Long loanAmount, int loanPeriod) {
+        creditModifier = getCreditModifier(personalCode);
+        BigDecimal creditScore = BigDecimal.valueOf(creditModifier)
+                .divide(BigDecimal.valueOf(loanAmount), 10, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(loanPeriod))
+                .divide(BigDecimal.TEN, 10, RoundingMode.HALF_UP);
+        return creditScore;
+    }
+
+    public boolean makeDecision(String personalCode, Long loanAmount, int loanPeriod) throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException,
+            NoValidLoanException {
+        verifyInputs(personalCode, loanAmount, loanPeriod);
+        BigDecimal creditScore = calculateCreditScore(personalCode, loanAmount, loanPeriod);
+        if (creditScore.compareTo(BigDecimal.valueOf(0.1)) >= 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public Period getAge(String personalCode) {
+        Integer century = Integer.parseInt(personalCode.substring(0, 1));
+
+        switch (century) {
+            case 3:
+            case 4:
+                century = 1900;
+                break;
+            case 5:
+            case 6:
+                century = 2000;
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid personal code.");
+        }
+
+        Integer lastTwoYearDigits = Integer.parseInt(personalCode.substring(1, 3));
+        Integer fullYear = century + lastTwoYearDigits;
+
+        Integer month = Integer.parseInt(personalCode.substring(3, 5));
+        Integer day = Integer.parseInt(personalCode.substring(5, 7));
+
+        LocalDate birthDate = LocalDate.of(fullYear, month, day);
+        LocalDate today = LocalDate.now();
+
+        Period age = Period.between(birthDate, today);
+        return age;
+    }
+
+    public Integer getAverageLifeExpectancy() {
+
+        Integer averageLifeExpectancyBalticYears = (BigDecimal.valueOf(DecisionEngineConstants.LIFE_EXPECTANCY_ESTONIA)
+                .add(DecisionEngineConstants.LIFE_EXPECTANCY_LATVIA)
+                .add(DecisionEngineConstants.LIFE_EXPECTANCY_LITHUANIA))
+                .divide(BigDecimal.valueOf(3), 2, RoundingMode.HALF_UP)
+                .setScale(0, RoundingMode.HALF_UP)
+                .intValue();
+
+        return averageLifeExpectancyBalticYears;
+    }
+
+    public boolean checkAge(String personalCode, Long loanAmount, int loanPeriod) throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException,
+            NoValidLoanException {
+        verifyInputs(personalCode, loanAmount, loanPeriod);
+        try {
+            Period age = getAge(personalCode);
+            Integer averageLifeExpectancy = getAverageLifeExpectancy();
+
+            Integer maxLoanPeriodYears = (DecisionEngineConstants.MAXIMUM_LOAN_PERIOD / 12);
+
+            Integer maxAllowedAge = averageLifeExpectancy - maxLoanPeriodYears;
+
+            if(age.getYears() >= 18 && age.getYears() <= maxAllowedAge) {
+                return false;
+            } else {
+                return true;
+            }
+        } catch (IllegalArgumentException e) {
+            throw new InvalidPersonalCodeException("Invalid personal ID code format.");
+        }
     }
 }
